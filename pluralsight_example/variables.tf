@@ -4,6 +4,18 @@ variable "aws_region" {
   default = "ap-southeast-1"
 }
 
+variable "redundancy_count" {
+  type = number
+  description = "Redundancy count for networks and instances"
+  default = 2
+}
+
+variable "vpc_subnets_cidr_block"{
+  type = list(string)
+  description = "CIDR blocks for subnets"
+  default = ["10.0.0.0/24","10.0.1.0/24","10.0.2.0/24"]
+}
+
 variable "company" {
   type        = string
   description = "Company name for resource tagging"
