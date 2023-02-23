@@ -1,13 +1,20 @@
 ##################################################################################
+# DATA
+##################################################################################
+
+data "aws_elb_service_account" "root" {}
+
+
+##################################################################################
 # RESOURCES
 ##################################################################################
 
 resource "aws_lb" "nginx" {
-  name               = "globo-web-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.nginx-alb-sg.id]
-  subnets            = aws_subnet.subnets.*.id
+  name                       = "globo-web-alb"
+  internal                   = false
+  load_balancer_type         = "application"
+  security_groups            = [aws_security_group.nginx-alb-sg.id]
+  subnets                    = aws_subnet.subnets.*.id
   enable_deletion_protection = false
 }
 
@@ -30,7 +37,7 @@ resource "aws_lb_listener" "nginx" {
 }
 
 resource "aws_lb_target_group_attachment" "nginx" {
-  count = var.redundancy_count
+  count            = var.redundancy_count
   target_group_arn = aws_lb_target_group.nginx.arn
   target_id        = aws_instance.nginx[count.index].id
   port             = 80

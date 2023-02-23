@@ -1,19 +1,19 @@
 variable "aws_region" {
-  type = string
+  type        = string
   description = "AWS Region to use for resources"
-  default = "ap-southeast-1"
+  default     = "ap-southeast-1"
 }
 
 variable "redundancy_count" {
-  type = number
+  type        = number
   description = "Redundancy count for networks and instances"
-  default = 2
+  default     = 3
 }
 
-variable "vpc_subnets_cidr_block"{
-  type = list(string)
+variable "vpc_subnets_cidr_block" {
+  type        = list(string)
   description = "CIDR blocks for subnets"
-  default = ["10.0.0.0/24","10.0.1.0/24","10.0.2.0/24"]
+  default     = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
 }
 
 variable "company" {
