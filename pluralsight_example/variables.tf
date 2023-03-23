@@ -10,10 +10,10 @@ variable "redundancy_count" {
   default     = 3
 }
 
-variable "vpc_subnets_cidr_block" {
-  type        = list(string)
+variable "vpc_cidr_block" {
+  type        = string
   description = "CIDR blocks for subnets"
-  default     = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+  default     = "10.0.0.0/16"
 }
 
 variable "company" {

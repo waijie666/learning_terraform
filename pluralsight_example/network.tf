@@ -13,7 +13,7 @@ data "aws_availability_zones" "available" {
 
 # NETWORKING #
 resource "aws_vpc" "vpc" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr_block
   enable_dns_hostnames = true
 }
 
@@ -28,19 +28,18 @@ resource "aws_internet_gateway" "igw" {
 
 resource "aws_subnet" "subnets" {
   count                   = (var.redundancy_count > length(data.aws_availability_zones.available.names)) ? length(data.aws_availability_zones.available.names) : var.redundancy_count
-  cidr_block              = "10.0.${count.index}.0/24"
+  cidr_block              = cidrsubnet(var.vpc_cidr_block, 8, count.index)
   vpc_id                  = aws_vpc.vpc.id
   map_public_ip_on_launch = true
   availability_zone       = data.aws_availability_zones.available.names[count.index]
 }
 
 resource "aws_subnet" "rds-subnets" {
-  count                   = (var.redundancy_count > length(data.aws_availability_zones.available.names)) ? length(data.aws_availability_zones.available.names) : var.redundancy_count
-  cidr_block              = "10.1.${count.index}.0/24"
-  vpc_id                  = aws_vpc.vpc.id
-  map_public_ip_on_launch = true
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
-  depends_on              = [aws_vpc_ipv4_cidr_block_association.secondary_cidr]
+  count             = (var.redundancy_count > length(data.aws_availability_zones.available.names)) ? length(data.aws_availability_zones.available.names) : var.redundancy_count
+  cidr_block        = cidrsubnet("10.1.0.0/16", 8, count.index)
+  vpc_id            = aws_vpc.vpc.id
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  depends_on        = [aws_vpc_ipv4_cidr_block_association.secondary_cidr]
 }
 
 
@@ -127,7 +126,7 @@ resource "aws_security_group" "rds-sg" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [var.vpc_cidr_block]
   }
 }
 

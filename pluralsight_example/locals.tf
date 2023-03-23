@@ -12,5 +12,5 @@ locals {
     deploy       = "terraform"
   }
 
-  s3_bucket_name = "globo-web-app-${random_integer.rand.result}"
+  s3_bucket_name = lower("globo-web-app-${random_integer.rand.result}")
 }

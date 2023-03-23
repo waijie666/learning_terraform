@@ -1,6 +1,6 @@
 data "aws_ssm_parameter" "ami" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
-  #name = "/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+  #name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+  name = "/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
 }
 
 # Keypair #
@@ -22,14 +22,59 @@ resource "aws_instance" "nginx" {
   root_block_device {
     volume_size = 8
   }
-  user_data = <<EOF
-#! /bin/bash
-sudo amazon-linux-extras install -y nginx1
-sudo service nginx start
-aws s3 cp s3://${aws_s3_bucket.web_bucket.id}/website/index.html /home/ec2-user/index.html
-aws s3 cp s3://${aws_s3_bucket.web_bucket.id}/website/Globo_logo_Vert.png /home/ec2-user/Globo_logo_Vert.png
-sudo rm /usr/share/nginx/html/index.html
-sudo cp /home/ec2-user/index.html /usr/share/nginx/html/index.html
-sudo cp /home/ec2-user/Globo_logo_Vert.png /usr/share/nginx/html/Globo_logo_Vert.png
-EOF
+  user_data = templatefile("${path.module}/startup_script.tpl", {
+    s3_bucket_name = aws_s3_bucket.web_bucket.id
+  })
+
+  tags = {
+    name = "nginx-${count.index}"
+  }
+}
+
+resource "aws_launch_template" "ec2_scaling_template_example" {
+  image_id               = nonsensitive(data.aws_ssm_parameter.ami.value)
+  instance_type          = "t2.micro"
+  key_name               = "ssh_key2"
+  vpc_security_group_ids = [aws_security_group.nginx-sg.id]
+  iam_instance_profile {
+    name = aws_iam_instance_profile.nginx_profile.name
+  }
+  user_data = base64encode(templatefile("${path.module}/startup_script.tpl", {
+    s3_bucket_name = aws_s3_bucket.web_bucket.id
+  }))
+
+  tags = {
+    name = "ec2-scaling"
+  }
+  name_prefix = "ec2-scaling"
+}
+
+resource "aws_autoscaling_group" "ec2_scaling" {
+  desired_capacity        = 3
+  max_size                = 9
+  min_size                = 3
+  default_instance_warmup = 60
+  vpc_zone_identifier     = aws_subnet.subnets.*.id
+  launch_template {
+    id = aws_launch_template.ec2_scaling_template_example.id
+  }
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50
+    }
+  }
+  target_group_arns = [aws_lb_target_group.nginx.arn]
+}
+
+resource "aws_autoscaling_policy" "example" {
+  autoscaling_group_name = aws_autoscaling_group.ec2_scaling.name
+  name                   = "Autoscale"
+  policy_type            = "TargetTrackingScaling"
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+    target_value = 20.0
+  }
 }

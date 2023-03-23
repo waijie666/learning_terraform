@@ -95,8 +95,11 @@ resource "aws_s3_bucket_acl" "web_bucket_acl" {
   acl    = "private"
 }
 
-resource "aws_s3_object" "website" {
+resource "aws_s3_object" "website_content" {
+  for_each = {
+    website = "/website/index.html"
+  }
   bucket = aws_s3_bucket.web_bucket.bucket
-  key    = "/website/index.html"
-  source = "./website/index.html"
+  key    = each.value
+  source = ".${each.value}"
 }
