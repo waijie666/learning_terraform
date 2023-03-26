@@ -12,37 +12,25 @@ data "aws_availability_zones" "available" {
 ##################################################################################
 
 # NETWORKING #
-resource "aws_vpc" "vpc" {
-  cidr_block           = var.vpc_cidr_block
-  enable_dns_hostnames = true
-}
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 3.0"
 
-resource "aws_vpc_ipv4_cidr_block_association" "secondary_cidr" {
-  vpc_id     = aws_vpc.vpc.id
-  cidr_block = "10.1.0.0/16"
-}
+  cidr           = var.vpc_cidr_block
+  secondary_cidr_blocks = ["10.10.0.0/16"]
+  azs            = slice(data.aws_availability_zones.available.names, 0, (var.redundancy_count))
+  public_subnets = [for subnet in range((var.redundancy_count > length(data.aws_availability_zones.available.names)) ? length(data.aws_availability_zones.available.names) : var.redundancy_count) : cidrsubnet(var.vpc_cidr_block, 8, subnet)]
 
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.vpc.id
-}
-
-resource "aws_subnet" "subnets" {
-  count                   = (var.redundancy_count > length(data.aws_availability_zones.available.names)) ? length(data.aws_availability_zones.available.names) : var.redundancy_count
-  cidr_block              = cidrsubnet(var.vpc_cidr_block, 8, count.index)
-  vpc_id                  = aws_vpc.vpc.id
+  enable_nat_gateway      = false
+  enable_dns_hostnames    = true
   map_public_ip_on_launch = true
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+
+  tags = {
+    Name = "vpc1"
+  }
 }
 
-resource "aws_subnet" "rds-subnets" {
-  count             = (var.redundancy_count > length(data.aws_availability_zones.available.names)) ? length(data.aws_availability_zones.available.names) : var.redundancy_count
-  cidr_block        = cidrsubnet("10.1.0.0/16", 8, count.index)
-  vpc_id            = aws_vpc.vpc.id
-  availability_zone = data.aws_availability_zones.available.names[count.index]
-  depends_on        = [aws_vpc_ipv4_cidr_block_association.secondary_cidr]
-}
-
-
+/*
 # ROUTING #
 resource "aws_route_table" "rtb" {
   vpc_id = aws_vpc.vpc.id
@@ -65,12 +53,13 @@ resource "aws_route_table_association" "rta-rds-subnets" {
   route_table_id = aws_route_table.rtb.id
 }
 
+*/
 
 # SECURITY GROUPS #
 # Nginx security group 
 resource "aws_security_group" "nginx-sg" {
   name   = "nginx_sg"
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = module.vpc.vpc_id
 
   # HTTP access from anywhere
   ingress {
@@ -98,7 +87,7 @@ resource "aws_security_group" "nginx-sg" {
 
 resource "aws_security_group" "nginx-alb-sg" {
   name   = "nginx_alb_sg"
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = module.vpc.vpc_id
 
   # HTTP access from anywhere
   ingress {
@@ -119,11 +108,11 @@ resource "aws_security_group" "nginx-alb-sg" {
 
 resource "aws_security_group" "rds-sg" {
   name   = "rds_sg"
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = module.vpc.vpc_id
 
   # HTTP access from anywhere
   ingress {
-    from_port   = 3306
+    from_port   = 0
     to_port     = 3306
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr_block]

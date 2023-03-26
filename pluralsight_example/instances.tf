@@ -14,7 +14,7 @@ resource "aws_instance" "nginx" {
   count                  = var.redundancy_count
   ami                    = nonsensitive(data.aws_ssm_parameter.ami.value)
   instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.subnets[count.index % length(aws_subnet.subnets)].id
+  subnet_id              = module.vpc.public_subnets[count.index % length(module.vpc.public_subnets)]
   vpc_security_group_ids = [aws_security_group.nginx-sg.id]
   iam_instance_profile   = aws_iam_instance_profile.nginx_profile.name
   depends_on             = [aws_iam_role_policy.allow_s3_all]
@@ -50,11 +50,11 @@ resource "aws_launch_template" "ec2_scaling_template_example" {
 }
 
 resource "aws_autoscaling_group" "ec2_scaling" {
-  desired_capacity        = 3
-  max_size                = 9
-  min_size                = 3
+  desired_capacity        = 1
+  max_size                = 5
+  min_size                = 1
   default_instance_warmup = 60
-  vpc_zone_identifier     = aws_subnet.subnets.*.id
+  vpc_zone_identifier     = module.vpc.public_subnets.*
   launch_template {
     id = aws_launch_template.ec2_scaling_template_example.id
   }

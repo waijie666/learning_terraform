@@ -1,13 +1,13 @@
 variable "aws_region" {
   type        = string
   description = "AWS Region to use for resources"
-  default     = "ap-southeast-1"
+  default     = "us-east-1"
 }
 
 variable "redundancy_count" {
   type        = number
   description = "Redundancy count for networks and instances"
-  default     = 3
+  default     = 2
 }
 
 variable "vpc_cidr_block" {

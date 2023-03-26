@@ -23,6 +23,70 @@ resource "aws_sns_topic" "sns_catch_all" {
   name = "sns_catch_all"
 }
 
+resource "aws_sns_topic_policy" "default" {
+  arn = aws_sns_topic.sns_catch_all.arn
+
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "sns_topic_policy" {
+  policy_id = "__default_policy_ID"
+
+  statement {
+    actions = [
+      "SNS:Subscribe",
+      "SNS:SetTopicAttributes",
+      "SNS:RemovePermission",
+      "SNS:Receive",
+      "SNS:Publish",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:GetTopicAttributes",
+      "SNS:DeleteTopic",
+      "SNS:AddPermission",
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceOwner"
+
+      values = [
+        data.aws_caller_identity.current.account_id,
+      ]
+    }
+
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    resources = [
+      aws_sns_topic.sns_catch_all.arn,
+    ]
+
+    sid = "__default_statement_ID"
+  }
+  
+  statement {
+    effect = "Allow"
+    actions = [
+      "SNS:Subscribe",
+      "SNS:Publish",
+    ]
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+    resources = [
+      aws_sns_topic.sns_catch_all.arn,
+    ]
+    sid = "2"
+  }
+}
+
 resource "aws_sns_topic_subscription" "sns_catch_all_lambda_target" {
   topic_arn = aws_sns_topic.sns_catch_all.arn
   protocol  = "lambda"
@@ -42,10 +106,38 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+data "aws_iam_policy_document" "lambda_logging" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+
+    resources = ["arn:aws:logs:*:*:*"]
+  }
+}
+
+resource "aws_iam_policy" "lambda_logging" {
+  name        = "lambda_logging"
+  path        = "/"
+  description = "IAM policy for logging from a lambda"
+  policy      = data.aws_iam_policy_document.lambda_logging.json
+}
+
+
 resource "aws_iam_role" "iam_for_lambda" {
   name               = "iam_for_lambda"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
+
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.lambda_logging.arn
+}
+
 
 data "archive_file" "sns_event_handling_payload" {
   type        = "zip"
